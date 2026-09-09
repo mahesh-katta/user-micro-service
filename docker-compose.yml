@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: userservice-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - userservice_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: user-service-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override datasource host to the docker service name, not localhost,
+      # since containers talk to each other by service name, not localhost
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+    ports:
+      - "${SERVER_PORT}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  userservice_pgdata:

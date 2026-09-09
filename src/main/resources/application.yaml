@@ -1,0 +1,41 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: user-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:${DB_PORT:5432}/${DB_NAME:userservice_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update       # use 'validate' in production once schema is stable
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE   # e.g. createdAt -> created_at in JSON
+
+# Custom JWT properties (read via @ConfigurationProperties or @Value)
+jwt:
+  secret: ${JWT_SECRET:change-this-to-a-long-random-secret-key-in-env-file}
+  access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
+  refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /api-docs
+
+logging:
+  level:
+    com.maheshreddy.userservice: DEBUG
+    org.springframework.security: INFO
