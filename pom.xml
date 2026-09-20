@@ -136,6 +136,15 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- MockMvc test support. Spring Boot 4 moved the web test slices out of
+		     spring-boot-test-autoconfigure into per-technology modules, so
+		     @AutoConfigureMockMvc now lives here rather than in starter-test. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 		<!-- Testcontainers: integration tests run against a real PostgreSQL -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

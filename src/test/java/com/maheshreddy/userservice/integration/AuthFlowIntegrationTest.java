@@ -1,13 +1,12 @@
 package com.maheshreddy.userservice.integration;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jayway.jsonpath.JsonPath;
 import com.maheshreddy.userservice.AbstractIntegrationTest;
 import com.maheshreddy.userservice.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -25,9 +24,6 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
 
     private static final String EMAIL = "integration@test.com";
     private static final String PASSWORD = "sup3r-secret-pw";
@@ -104,8 +100,7 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
 
-        JsonNode json = objectMapper.readTree(body);
-        String accessToken = json.get("access_token").asText();
+        String accessToken = JsonPath.read(body, "$.access_token");
 
         mockMvc.perform(get("/api/users/me").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
@@ -120,7 +115,7 @@ class AuthFlowIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
 
-        String accessToken = objectMapper.readTree(body).get("access_token").asText();
+        String accessToken = JsonPath.read(body, "$.access_token");
 
         mockMvc.perform(get("/api/users").header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isForbidden());
