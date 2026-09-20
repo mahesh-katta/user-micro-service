@@ -52,10 +52,16 @@
 			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
-		<!-- Flyway: versioned schema migrations, replaces ddl-auto=update -->
+		<!-- Flyway: versioned schema migrations, replaces ddl-auto=update.
+		     The starter is required, not just flyway-core: Spring Boot 4 moved
+		     FlywayAutoConfiguration into its own spring-boot-flyway module, so
+		     the bare library is on the classpath but nothing runs the
+		     migrations, and Hibernate then validates an empty schema.
+		     flyway-core arrives transitively; flyway-database-postgresql is
+		     optional in that module, so it stays declared here. -->
 		<dependency>
-			<groupId>org.flywaydb</groupId>
-			<artifactId>flyway-core</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.flywaydb</groupId>
