@@ -1,0 +1,45 @@
+flowchart TB
+    USER["Client"]
+
+    subgraph GH["GitHub Actions"]
+        direction TB
+        PUSH["git push to main"]
+        CI["CI<br/>mvn verify<br/>Testcontainers + PostgreSQL"]
+        IMG["Build image<br/>multi-stage, layered, non-root"]
+        PUSH --> CI --> IMG
+    end
+
+    subgraph AWS["AWS account"]
+        direction TB
+
+        subgraph SVC["Managed services"]
+            direction LR
+            PARAM["SSM Parameter Store<br/>DB password, JWT key<br/>SecureString"]
+            ECR["ECR<br/>immutable tags<br/>scan on push"]
+            RUN["SSM Run Command"]
+        end
+
+        subgraph VPC["VPC 10.0.0.0/16"]
+            direction TB
+            IGW["Internet gateway"]
+
+            subgraph PUB["Public subnets 10.0.1.0/24 and 10.0.2.0/24"]
+                EC2["EC2 t3.micro<br/>app container :8080<br/>PostgreSQL container"]
+            end
+
+            subgraph PRIV["Private subnets, no route to the internet"]
+                RDS["RDS PostgreSQL<br/>optional, off by default"]
+            end
+
+            IGW --> EC2
+            EC2 -.->|"reachable only from<br/>the app security group"| RDS
+        end
+
+        RUN -->|"run deploy.sh"| EC2
+        EC2 -->|"read secrets at start"| PARAM
+        EC2 -->|"pull image by tag"| ECR
+    end
+
+    IMG -->|"OIDC AssumeRole<br/>no stored AWS keys"| ECR
+    IMG -->|"send deploy.sh"| RUN
+    USER --> IGW

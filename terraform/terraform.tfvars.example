@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars and adjust. terraform.tfvars is gitignored.
+
+aws_region        = "ap-south-1"
+project_name      = "user-service"
+github_repository = "mahesh-katta/user-micro-service"
+
+# Budget alerts are skipped entirely if this is empty.
+alert_email        = "kattamaheshreddy3@gmail.com"
+monthly_budget_usd = 5
+
+# Narrow this to your own address while developing:
+#   app_ingress_cidrs = ["203.0.113.4/32"]
+app_ingress_cidrs = ["0.0.0.0/0"]
+
+# Leave empty. Administration is through SSM Session Manager, so port 22 never
+# needs to be open.
+admin_ssh_cidrs = []
+
+instance_type = "t3.micro"
+
+# Both of these cost real money. Leave them off unless you are demonstrating
+# them, and run `terraform destroy` afterwards.
+enable_rds         = false
+enable_nat_gateway = false

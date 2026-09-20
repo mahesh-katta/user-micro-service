@@ -1,0 +1,132 @@
+name: CI
+
+# Runs on every push to any branch and on every pull request. This is the gate:
+# if it is red, nothing gets built and nothing gets deployed.
+on:
+  push:
+    # main is covered by deploy.yml, which calls this workflow. Excluding it
+    # here stops every push to main running the suite twice.
+    branches: ["**", "!main"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # The GitHub-hosted runner already has a Docker daemon, which is what
+      # Testcontainers needs to start the PostgreSQL instance the integration
+      # tests run against.
+      - name: Run unit and integration tests
+        run: ./mvnw -B --no-transfer-progress verify
+
+      - name: Publish test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload the built jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: user-service-jar
+          path: target/*.jar
+          retention-days: 7
+
+  docker:
+    name: Build container image
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Builds but does not push. This proves the Dockerfile is valid on every
+      # commit; pushing to ECR is deploy.yml's job and only happens on main.
+      - name: Build the image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: user-service:ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A container that starts, connects to a database and reports UP is a far
+      # stronger signal than one that merely builds.
+      - name: Smoke-test the image against a real PostgreSQL
+        run: |
+          docker network create smoke
+
+          docker run -d --name db --network smoke \
+            -e POSTGRES_DB=userservice_db \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=smoke-test-password \
+            postgres:16-alpine
+
+          echo "Waiting for PostgreSQL..."
+          for i in $(seq 1 30); do
+            if docker exec db pg_isready -U postgres -d userservice_db >/dev/null 2>&1; then
+              echo "PostgreSQL is ready"; break
+            fi
+            sleep 2
+          done
+
+          docker run -d --name app --network smoke -p 8080:8080 \
+            -e DB_HOST=db \
+            -e DB_PORT=5432 \
+            -e DB_NAME=userservice_db \
+            -e DB_USERNAME=postgres \
+            -e DB_PASSWORD=smoke-test-password \
+            -e JWT_SECRET=ci-smoke-test-secret-long-enough-for-hmac-sha256-signing \
+            user-service:ci-${{ github.sha }}
+
+          echo "Waiting for the application to report UP..."
+          for i in $(seq 1 45); do
+            if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
+              echo "Application is UP"
+              curl -sS http://localhost:8080/actuator/health
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::Application never reported UP. Container logs follow."
+          docker logs app
+          exit 1
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs app || true
