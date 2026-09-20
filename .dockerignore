@@ -1,0 +1,37 @@
+# Build output — the image builds from source, never from a host-built jar
+target/
+!.mvn/wrapper/maven-wrapper.properties
+
+# Secrets must never enter the build context
+.env
+.env.*
+!.env.example
+
+# VCS and CI
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Infrastructure — not part of the application image
+terraform/
+docs/
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# IDE and OS noise
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+
+# Docs
+*.md
+!README.md
+HELP.md
+
+# Logs
+*.log

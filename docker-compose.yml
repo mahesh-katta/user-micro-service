@@ -1,41 +1,71 @@
-version: '3.8'
+# Local orchestration: the service plus its PostgreSQL, wired on a private
+# bridge network. Only the app publishes a port to the host; the database is
+# reachable from the app container only. This mirrors the AWS topology, where
+# the database sits in a private subnet with no route to the internet.
+
+name: user-service
 
 services:
+
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: userservice-postgres
     restart: unless-stopped
-    env_file:
-      - .env
+    env_file: [.env]
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "${DB_PORT}:5432"
+    # No host port published: nothing outside the compose network can reach it.
+    # Uncomment only when you need a GUI client attached.
+    # ports:
+    #   - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
-      - userservice_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: user-service:local
     container_name: user-service-app
     restart: unless-stopped
-    env_file:
-      - .env
+    env_file: [.env]
     environment:
-      # Override datasource host to the docker service name, not localhost,
-      # since containers talk to each other by service name, not localhost
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      # Containers reach each other by service name, not localhost.
+      DB_HOST: postgres
+      DB_PORT: 5432
     ports:
-      - "${SERVER_PORT}:8080"
+      - "${SERVER_PORT:-8080}:8080"
+    networks: [backend]
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+networks:
+  backend:
+    driver: bridge
 
 volumes:
-  userservice_pgdata:
+  pgdata:
