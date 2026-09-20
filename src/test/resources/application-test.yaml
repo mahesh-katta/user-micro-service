@@ -1,0 +1,17 @@
+# Test-profile overlay. This file deliberately does NOT repeat the main
+# configuration: it is named application-test.yaml rather than application.yaml
+# precisely so that src/main/resources/application.yaml still applies. A file
+# called application.yaml here would sit earlier on the test classpath and
+# replace the main one wholesale, silently dropping settings such as the
+# snake_case JSON naming strategy and open-in-view: false, so tests would
+# exercise a different application than the one that ships.
+#
+# The datasource is supplied at runtime by Testcontainers via @ServiceConnection.
+
+jwt:
+  secret: test-secret-key-that-is-definitely-long-enough-for-hmac-sha256-signing
+
+logging:
+  level:
+    com.maheshreddy.userservice: INFO
+    org.testcontainers: INFO
