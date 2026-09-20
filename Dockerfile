@@ -28,9 +28,20 @@ RUN --mount=type=cache,target=/root/.m2 \
 # makes ECR pushes and EC2 pulls fast.
 ###############################################################################
 FROM eclipse-temurin:21-jre-alpine AS extract
-WORKDIR /extract
+WORKDIR /staging
 COPY --from=build /build/target/*.jar app.jar
-RUN java -Djarmode=tools -jar app.jar extract --layers --launcher --destination .
+
+# The destination must not be an existing non-empty directory, so the jar is
+# staged elsewhere and /extract is created by the extraction itself.
+RUN java -Djarmode=tools -jar app.jar extract --layers --launcher --destination /extract
+
+# Layer directories come from the jar's layers.idx, and a layer with no content
+# is simply absent - snapshot-dependencies is empty for a release build. COPY
+# fails on a missing source, so guarantee all four exist.
+RUN mkdir -p /extract/dependencies \
+             /extract/spring-boot-loader \
+             /extract/snapshot-dependencies \
+             /extract/application
 
 ###############################################################################
 # Stage 3 — runtime
